@@ -11,3 +11,16 @@ FEE_SERVICE_PROMPT = """
 질문: {question}
 관련 법률 조항 및 수수료 정보를 포함하여 응답해 주세요.
 """
+
+# 종목에 대한 재무제표 분석 프롬프트 템플릿
+FINANCIAL_STATEMENT_PROMPT = """
+
+
+"""
+
+
+# 오늘의 시황정보 프롬프트 템플릿
+MARKET_INFO_PROMPT = """
+
+
+"""

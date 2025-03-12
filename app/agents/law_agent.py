@@ -49,7 +49,6 @@ def rag_argumentation(query: str) -> str:
 from langchain.agents import initialize_agent, AgentType
 
 def process_law_agent(query: str) -> dict:
-
     #데코레이터 사용 할 때의 방식 코딩
     tools = [
         legal_compliance,
@@ -65,4 +64,9 @@ def process_law_agent(query: str) -> dict:
     )
 
     result = agent.run(query)
+    return result
+
+    # 입력된 포트폴리오 데이터와 시황 관련 질문을 하나의 쿼리로 통합하여 전달
+    combined_query = f"포트폴리오 데이터: {request.portfolio_data}. 질문: {request.query}"
+    result = agent.run(combined_query)
     return result
