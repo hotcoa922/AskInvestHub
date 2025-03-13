@@ -8,6 +8,48 @@ from langgraph import graph
 
 from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O
 
+
+# PDF 전처리 및 벡터 DB 구축 함수
+import os
+from langchain.document_loaders import PyPDFLoader                  # pdf에서 텍스트 추출
+from langchain.text_splitter import RecursiveCharacterTextSplitter  # 텍스트 분할 방식
+from langchain.vectorstores import FAISS                            # 고속 벡터 검색을 위한 라이브러리
+from langchain.embeddings import AzureOpenAIEmbeddings
+from core.settings import AOAI_DEPLOY_EMBED_ADA
+
+def build_vector_store(pdf_directory: str) -> FAISS:
+    documents = [] # 모든 PDF 파일에서 추출된 문서를 저장할 리스트
+
+    # 1. PDF 파일 로드 및 텍스트 추출
+    for filename in os.listdir(pdf_directory):  # 내부의 모든 파일 목록을 가져옴
+        if filename.lower().endswith(".pdf"):
+            file_path = os.path.join(pdf_directory, filename)   # 파일 전체경로 생성
+            loader = PyPDFLoader(file_path)     # PDF 파일 로드할 수 있는 PyPDFLoader객체 생성
+            docs = loader.load()        # PDF에서 텍스트 추출
+            documents.extend(docs)      # 추출된 문서를 documents 리스트에 추가
+
+    # 2. 텍스트 분할: RecursiveCharacterTextSplitter 사용
+    # chunk_size와 chunk_overlap은 필요에 따라 조정 가능
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    docs = splitter.split_documents(documents)
+
+    # 3. 임베딩 생성: 각 텍스트 청크를 벡터화
+    embeddings = AzureOpenAIEmbeddings(
+        endpoint=AOAI_ENDPOINT,
+        api_key=AOAI_API_KEY,
+        deployment=AOAI_DEPLOY_EMBED_ADA,
+        api_version="2024-08-01-preview",       # 추후 변경
+    )
+
+    # 4. FAISS 벡터 스토어 생성
+    vector_store = FAISS.from_documents(docs, embeddings)   # 임베딩 벡터를 FAISS DB로 변환
+    return vector_store     # FAISS 객체 반환
+
+
+
+
+
+
 # AzureChatOpenAI 인스턴스 생성
 chat_llm = AzureChatOpenAI(
     endpoint=AOAI_ENDPOINT,
@@ -16,9 +58,9 @@ chat_llm = AzureChatOpenAI(
     api_version="2024-08-01-preview",
 )
 
-"""
-    직접호출방식, tool데코레이터 방식중 tool데코레이터 방식 채택
-"""
+
+# 직접호출방식, tool데코레이터 방식중 tool데코레이터 방식 채택
+
 from langchain_core.tools import tool
 
 @tool
