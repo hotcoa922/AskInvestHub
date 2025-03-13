@@ -4,7 +4,7 @@ from langchain.chains import LLMChain
 
 from prompts.prompts import LEGAL_COMPLIANCE_PROMPT, FEE_SERVICE_PROMPT #미리 정의한 프롬프트 가져오기
 
-from langgraph import graph
+# from langgraph import graph
 
 from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O
 
@@ -46,6 +46,32 @@ def build_vector_store(pdf_directory: str) -> FAISS:
     return vector_store     # FAISS 객체 반환
 
 
+def save_vector_store(vector_store: FAISS, save_path: str):
+    vector_store.save(save_path)
+
+def load_vector_store(save_path: str, embeddings) -> FAISS:
+    return FAISS.load(save_path, embeddings)
+
+# 직접 실행될 때만 해당 코드 블록이 실행
+if __name__ == "__main__":
+    pdf_directory = "data/legal_docs"
+    vector_store_dir = "data/vector_store/faiss_index"
+
+    if os.path.exists(vector_store_dir):
+        print("저장된 벡터 DB 로드 중...")
+        embeddings = AzureOpenAIEmbeddings(
+            endpoint=AOAI_ENDPOINT,
+            api_key=AOAI_API_KEY,
+            deployment=AOAI_DEPLOY_EMBED_ADA,
+            api_version="2024-08-01-preview",
+        )
+        vector_store = load_vector_store(vector_store_dir, embeddings)
+    else:
+        print("벡터 DB 구축 중...")
+        vector_store = build_vector_store(pdf_directory)
+        save_vector_store(vector_store, vector_store_dir)
+
+    print("벡터 DB 구축/로드 완료.")
 
 
 
@@ -61,7 +87,7 @@ chat_llm = AzureChatOpenAI(
 
 # 직접호출방식, tool데코레이터 방식중 tool데코레이터 방식 채택
 
-from langchain_core.tools import tool
+from langchain.tools import tool
 
 @tool
 def legal_compliance(query: str) -> str:
@@ -84,7 +110,7 @@ def info_service(query: str) -> str:
 # RAG방식으로 법률 문서 정보를 요약하는 것
 @tool
 def rag_argumentation(query: str) -> str:
-    return f"Augmented data: Based on the query '{query}', additional legal documents werw summarized."
+    return f"Augmented data: Based on the query '{query}', additional legal documents were summarized."
 
 
 # 에이전트 초기화 및 실행
@@ -106,9 +132,4 @@ def process_law_agent(query: str) -> dict:
     )
 
     result = agent.run(query)
-    return result
-
-    # 입력된 포트폴리오 데이터와 시황 관련 질문을 하나의 쿼리로 통합하여 전달
-    combined_query = f"포트폴리오 데이터: {request.portfolio_data}. 질문: {request.query}"
-    result = agent.run(combined_query)
     return result
