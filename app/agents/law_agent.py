@@ -1,4 +1,4 @@
-from langchain.chat_models import AzureChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
@@ -13,8 +13,8 @@ from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O
 import os
 from langchain.document_loaders import PyPDFLoader                  # pdf에서 텍스트 추출
 from langchain.text_splitter import RecursiveCharacterTextSplitter  # 텍스트 분할 방식
-from langchain.vectorstores import FAISS                            # 고속 벡터 검색을 위한 라이브러리
-from langchain.embeddings import AzureOpenAIEmbeddings
+from langchain_community.vectorstores import FAISS                            # 고속 벡터 검색을 위한 라이브러리
+from langchain_community.embeddings import AzureOpenAIEmbeddings
 from core.settings import AOAI_DEPLOY_EMBED_ADA
 
 def build_vector_store(pdf_directory: str) -> FAISS:
@@ -35,9 +35,9 @@ def build_vector_store(pdf_directory: str) -> FAISS:
 
     # 3. 임베딩 생성: 각 텍스트 청크를 벡터화
     embeddings = AzureOpenAIEmbeddings(
-        endpoint=AOAI_ENDPOINT,
+        azure_endpoint=AOAI_ENDPOINT,
         api_key=AOAI_API_KEY,
-        deployment=AOAI_DEPLOY_EMBED_ADA,
+        azure_deployment=AOAI_DEPLOY_EMBED_ADA,
         api_version="2024-08-01-preview",       # 추후 변경
     )
 
@@ -47,10 +47,10 @@ def build_vector_store(pdf_directory: str) -> FAISS:
 
 
 def save_vector_store(vector_store: FAISS, save_path: str):
-    vector_store.save(save_path)
+    vector_store.save_local(save_path)
 
 def load_vector_store(save_path: str, embeddings) -> FAISS:
-    return FAISS.load(save_path, embeddings)
+    return FAISS.load_local(save_path, embeddings)
 
 # 직접 실행될 때만 해당 코드 블록이 실행
 if __name__ == "__main__":
@@ -60,9 +60,9 @@ if __name__ == "__main__":
     if os.path.exists(vector_store_dir):
         print("저장된 벡터 DB 로드 중...")
         embeddings = AzureOpenAIEmbeddings(
-            endpoint=AOAI_ENDPOINT,
+            azure_endpoint=AOAI_ENDPOINT,
             api_key=AOAI_API_KEY,
-            deployment=AOAI_DEPLOY_EMBED_ADA,
+            azure_deployment=AOAI_DEPLOY_EMBED_ADA,
             api_version="2024-08-01-preview",
         )
         vector_store = load_vector_store(vector_store_dir, embeddings)
@@ -78,9 +78,9 @@ if __name__ == "__main__":
 
 # AzureChatOpenAI 인스턴스 생성
 chat_llm = AzureChatOpenAI(
-    endpoint=AOAI_ENDPOINT,
+    azure_endpoint=AOAI_ENDPOINT,
     api_key=AOAI_API_KEY,
-    deployment = AOAI_DEPLOY_GPT4O,
+    azure_deployment = AOAI_DEPLOY_GPT4O,
     api_version="2024-08-01-preview",
 )
 
@@ -91,25 +91,39 @@ from langchain.tools import tool
 
 @tool
 def legal_compliance(query: str) -> str:
+    """
+    주어진 질문에 대해 법률 적합성을 평가하는 응답을 생성합니다.
+    """
     prompt_template = PromptTemplate(
         template=LEGAL_COMPLIANCE_PROMPT,
         input_variables=["question"]
     )
-    chain = LLMChain(llm=chat_llm, prompt= prompt_template)     # 체인 구성
-    return chain.run(question=query).strip()
+
+    # 프롬프트 직접 포맷
+    formatted_prompt = prompt_template.format(question=query)
+    response = chat_llm.invoke(formatted_prompt)
+    return response.content.strip()
+
 
 @tool
 def info_service(query: str) -> str:
+    """
+    주어진 질문에 기반하여 수수료 및 기타 서비스 정보를 분석한 응답을 생성합니다.
+    """
     prompt_template = PromptTemplate(
         template=FEE_SERVICE_PROMPT,
         input_variables=["question"]
     )
-    chain = LLMChain(llm=chat_llm, prompt = prompt_template)     # 체인 구성
-    return chain.run(question=query).strip()
+    formatted_prompt = prompt_template.format(question=query)
+    response = chat_llm.invoke(formatted_prompt)
+    return response.content.strip()
 
 # RAG방식으로 법률 문서 정보를 요약하는 것
 @tool
 def rag_argumentation(query: str) -> str:
+    """
+    주어진 질문에 대해 추가 법률 문서 정보를 요약하여 증강 데이터를 반환합니다.
+    """
     return f"Augmented data: Based on the query '{query}', additional legal documents were summarized."
 
 
@@ -131,5 +145,5 @@ def process_law_agent(query: str) -> dict:
         verbose=True
     )
 
-    result = agent.run(query)
+    result = agent.invoke(query)
     return result

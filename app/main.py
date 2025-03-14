@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 
-from api import agent
+from api import question_router
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(
     title="Ask Invest Hub 서비스(AIH)",
     description="에이전트 기반 AI 서비스 (법률 및 포트폴리오 분석)",
-    version="0.1"
+    version="0.4.0"
 )
 
 # 기본 엔드포인트: API 테스트용
@@ -34,4 +34,5 @@ app.add_middleware(
 
 
 # 라우터 등록
-app.include_router(agent.router, prefix="/agent", tags=["agent"])
+from api.question_router import router as question_router
+app.include_router(question_router, prefix="/agent", tags=["agent"])

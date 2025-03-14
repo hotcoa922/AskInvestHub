@@ -1,7 +1,10 @@
 fastapi==0.108.0    #  백엔드 API 서버를 구축하기 위한 프레임워크
 uvicorn==0.22.0 # FastAPI 애플리케이션을 실행할 때 사용되는 ASGI 서버
-streamlit==1.21.0
-langchain==0.3.18
+# streamlit==1.21.0
+langchain==0.3.20
 langgraph==0.2.70
 openai==1.61.1
 python-dotenv==0.21.1
+langchain_community==0.3.19
+langchain-openai==0.3.7
+langchain-core==0.3.41

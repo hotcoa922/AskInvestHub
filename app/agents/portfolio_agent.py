@@ -1,4 +1,4 @@
-from langchain.chat_models import AzureChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
@@ -9,9 +9,9 @@ from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O
 
 
 chat_llm = AzureChatOpenAI(
-    endpoint = AOAI_ENDPOINT,
+    azure_endpoint=AOAI_ENDPOINT,
     api_key = AOAI_API_KEY,
-    deployment = AOAI_DEPLOY_GPT4O,
+    azure_deployment = AOAI_DEPLOY_GPT4O,
     api_version = "2024-08-01-preview",
 )
 
@@ -19,24 +19,32 @@ from langchain_core.tools import tool
 
 @tool
 def financial_statement(portfolio_data: str) -> str:
+    """
+    주어진 질문에 대해 재무제표 분석을 제공합니다.
+    """
     prompt_template = PromptTemplate(
         template = FINANCIAL_STATEMENT_PROMPT,
         input_variables=["portfolio_data"]
     )
-    chain = LLMChain(llm = chat_llm, prompt = prompt_template)
-    return chain.run(portfolio_data=portfolio_data).strip()
+    formatted_prompt = prompt_template.format(portfolio_data=portfolio_data)
+    response = chat_llm.invoke(formatted_prompt)
+    return response.content.strip()
 
 
 # 오늘의 시황은 추후 상세 구현 예정
 @tool
 def market_info(query: str) -> str:
+    """
+    주어진 질문에 대해 일일 시황을 반홥합니다.
+    """
 
     prompt_template = PromptTemplate(
         template=MARKET_INFO_PROMPT,
         input_variables=["query"]
     )
-    chain = LLMChain(llm=chat_llm, prompt=prompt_template)
-    return chain.run(query=query).strip()
+    formatted_prompt = prompt_template.format(query=query)
+    response = chat_llm.invoke(formatted_prompt)
+    return response.content.strip()
 
 
 from pydantic import BaseModel

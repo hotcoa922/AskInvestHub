@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from langchain.chat_models import AzureChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O
 from langchain.chains import LLMChain
 
@@ -36,9 +36,9 @@ human_message = HumanMessagePromptTemplate.from_template("{query}") # 위와 동
 chat_prompt = ChatPromptTemplate.from_messages([system_message, human_message])
 
 chat_llm = AzureChatOpenAI(
-    endpoint=AOAI_ENDPOINT,
+    azure_endpoint=AOAI_ENDPOINT,
     api_key=AOAI_API_KEY,
-    deployment=AOAI_DEPLOY_GPT4O,
+    azure_deployment=AOAI_DEPLOY_GPT4O,
     api_version="2024-08-01-preview",
 )
 
@@ -46,11 +46,12 @@ from agents.law_agent import process_law_agent
 from agents.portfolio_agent import process_portfolio_agent
 
 def determine_agent(query: str) -> str:
-    chain = LLMChain(llm=chat_llm, prompt=chat_prompt)
-    classification = chain.run(query=query).strip().lower()
-    # # 결과가 여러 단어일 경우 첫 단어 사용
-    # return classification.split()[0]
-
+    # 메시지 목록을 생성
+    messages = chat_prompt.format_messages(query=query)
+    # AzureChatOpenAI 인스턴스를 호출하여 응답을 받음
+    response = chat_llm.invoke(messages)        #deprecated 되었으며 대신 invoke 메서드를 사용
+    # -> AIMessage 객체에는 .run() 메서드가 없으므로 .content 속성을 사용해야함
+    classification = response.content.strip().lower()
     # 후처리 없이 첫 번째 단어만 사용하되, 가능하면 출력이 확실하도록 함.
     return classification.split()[0]
 
