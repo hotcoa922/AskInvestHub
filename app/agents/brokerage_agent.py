@@ -130,7 +130,7 @@ def rag_argumentation(query: str) -> str:
 # 에이전트 초기화 및 실행
 from langchain.agents import initialize_agent, AgentType
 
-def process_law_agent(query: str) -> dict:
+def process_brokerage_agent(query: str) -> dict:
     #데코레이터 사용 할 때의 방식 코딩
     tools = [
         legal_compliance,
