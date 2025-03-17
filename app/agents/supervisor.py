@@ -10,14 +10,14 @@ class SupervisorRequest(BaseModel):
 # 시스템 프롬프트: 에이전트 결정 기준을 시스템 메시지로 설정
 SYSTEM_PROMPT = (
     """
-    당신은 투자 서비스의 에이전트 결정자입니다.
+    당신은 종합 증권 서비스의 에이전트 결정자입니다.
     아래 기준에 따라 사용자의 질문을 분석하여 반드시 아래 두 가지 중 하나만을 단독으로 출력하세요.
 
     기준:
-    - "law": 질문이 투자법, 수수료, 규제 등 법률 관련 내용일 경우.
-    - "portfolio": 질문이 기업 재무, 시장 시황, 포트폴리오 구성 등 포트폴리오 분석 관련 내용일 경우.
+    - "brokerage": 질문이 증권관련 법률, 증권사의 수수료 등과 같은 정보, 투자법, 수수료, 규제 내용일 경우.
+    - "portfolio": 질문이 기업 재무, 시장 시황, 포트폴리오 구성, 개별 종목 정보, 종목 비교, 포트폴리오 분석 관련 내용일 경우.
 
-    반드시 출력은 추가 문장 없이 단 하나의 단어, "law" 또는 "portfolio"만을 반환해야 합니다.
+    반드시 출력은 추가 문장 없이 단 하나의 단어, "brokerage" 또는 "portfolio"만을 반환해야 합니다.
     """
 )
 
@@ -42,7 +42,7 @@ chat_llm = AzureChatOpenAI(
     api_version="2024-08-01-preview",
 )
 
-from agents.law_agent import process_law_agent
+from agents.brokerage_agent import process_brokerage_agent
 from agents.portfolio_agent import process_portfolio_agent
 
 def determine_agent(query: str) -> str:
@@ -59,9 +59,9 @@ def determine_agent(query: str) -> str:
 def supervisor_agent(request: SupervisorRequest) -> dict:
     agent_type = determine_agent(request.query)     # request.query 통해 사용자 질문 가져옴
 
-    if agent_type == "law":
-        result = process_law_agent(request.query)
-        selected_agent = "law_agent"
+    if agent_type == "brokerage":
+        result = process_brokerage_agent(request.query)
+        selected_agent = "brokerage_agent"
     elif agent_type == "portfolio":
         result = process_portfolio_agent(request.query)
         selected_agent = "portfolio_agent"
