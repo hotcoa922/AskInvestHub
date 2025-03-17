@@ -1,11 +1,14 @@
 # 프로젝트 내에서 에이전트 관련 API 엔드포인트들을 모아둔 파일
 # 사실상 endpoints 모음소
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agents.supervisor import supervisor_agent
+from agents.graph_builder import graph
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -13,20 +16,18 @@ router = APIRouter()
 class UserQuestion(BaseModel):
     query: str
 
-# 아래 코드 폐기
-# # 임시 에이전트 결정 함수 (추후 실제 로직으로 대체)
-# def decide_agent(question: str) -> str:
-#     # 간단 예시: 질문에 "법률"이라는 단어가 포함되면 Agent1, 그렇지 않으면 Agent2
-#     if "법률" in question:
-#         return "agent1"  # 법률 관련 처리
-#     else:
-#         return "agent2"  # 포트폴리오 분석 관련 처리
 
 @router.post("/ask")
 async def ask_question(request: UserQuestion):
     try:
-        result = supervisor_agent(request)
+        state = {"messages": [], "latest_query": request.query} # 초기 state 생성
+        logger.info(f"📨 [INFO] /ask 엔드포인트 호출됨: {request.query}")
+        logger.debug(f"🔍 [DEBUG] graph 실행 전 state: {state}")
+        final_state = graph.invoke(state)
+        logger.debug(f"✅ [DEBUG] graph 실행 후 state: {final_state}")
+        result = final_state
         return result
     except Exception as e:
+        logger.error(f"❌ [ERROR] /ask 엔드포인트 실행 중 오류: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 

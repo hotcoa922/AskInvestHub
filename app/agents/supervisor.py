@@ -1,11 +1,14 @@
+import logging
+
 from pydantic import BaseModel
 from langchain_openai import AzureChatOpenAI
 from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O
 from langchain.chains import LLMChain
 
+logger = logging.getLogger(__name__)
+
 class SupervisorRequest(BaseModel):
     query: str
-
 
 # 시스템 프롬프트: 에이전트 결정 기준을 시스템 메시지로 설정
 SYSTEM_PROMPT = (
@@ -57,7 +60,12 @@ def determine_agent(query: str) -> str:
 
 
 def supervisor_agent(request: SupervisorRequest) -> dict:
+    logger.info(f"📥 [INFO] supervisor_agent 실행: {request.query}")
     agent_type = determine_agent(request.query)     # request.query 통해 사용자 질문 가져옴
+
+    if agent_type not in ["brokerage", "portfolio"]:
+        print(f"[ERROR] 잘못된 에이전트 분류: {agent_type}")  # 로그 추가
+        return {"error": f"잘못된 에이전트 분류: {agent_type}"}
 
     if agent_type == "brokerage":
         result = process_brokerage_agent(request.query)

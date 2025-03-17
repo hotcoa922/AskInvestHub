@@ -145,5 +145,5 @@ def process_brokerage_agent(query: str) -> dict:
         verbose=True
     )
 
-    result = agent.invoke(query)
+    result = agent.invoke(query)    # 입력된 질문 바탕으로 답변 생성
     return result
