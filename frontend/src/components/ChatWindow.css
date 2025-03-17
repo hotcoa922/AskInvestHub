@@ -1,25 +1,36 @@
+/* ChatWindow.css */
+
+/* 전체 컨테이너 (배경 그라데이션 + 폰트) */
 .chat-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
   padding: 20px;
   box-sizing: border-box;
+  background: linear-gradient(135deg, #1f1c2c, #928dab);
+  font-family: 'Roboto', sans-serif;
+  color: #fff;
 }
 
+/* 채팅창 영역 */
 .chat-window {
   flex: 1;
   overflow-y: auto;
   background: rgba(255, 255, 255, 0.1);
-  padding: 10px;
-  border-radius: 10px;
+  padding: 20px;
+  border-radius: 20px;
   margin-bottom: 20px;
+  box-shadow: 8px 8px 16px rgba(0,0,0,0.3),
+              -4px -4px 8px rgba(255,255,255,0.1);
 }
 
+/* 메시지 레이아웃 */
 .chat-message {
-  margin: 10px 0;
+  margin: 15px 0;
   display: flex;
+  align-items: center;
 }
 
 .chat-message.user {
@@ -30,10 +41,15 @@
   justify-content: flex-start;
 }
 
+/* 말풍선 스타일 */
 .message-bubble {
-  padding: 10px 15px;
-  border-radius: 15px;
-  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  max-width: 70%;
+  line-height: 1.4;
+  word-wrap: break-word;
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.2),
+              inset -2px -2px 4px rgba(255, 255, 255, 0.05);
 }
 
 .chat-message.user .message-bubble {
@@ -46,23 +62,79 @@
   color: white;
 }
 
+/* 로딩 중 말풍선 구분 */
+.loading-bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 3D 버튼: 최종 소요시간 */
+.final-time-button {
+  margin-left: 10px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+  background: linear-gradient(45deg, #a044ff, #6a3093);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #5e3877;
+  transition: transform 0.1s ease;
+}
+
+.final-time-button:active {
+  box-shadow: none;
+  transform: translateY(4px);
+}
+
+/* 입력 폼 */
 .chat-form {
   display: flex;
+  gap: 10px;
 }
 
 .chat-form input {
   flex: 1;
-  padding: 10px;
-  border-radius: 10px;
+  padding: 12px;
+  border-radius: 12px;
   border: none;
-  margin-right: 10px;
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.2),
+              inset -2px -2px 4px rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 .chat-form button {
-  padding: 10px 20px;
+  padding: 12px 20px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: linear-gradient(45deg, #a044ff, #6a3093);
   color: white;
   cursor: pointer;
+  box-shadow: 0 4px 0 #5e3877;
+  transition: transform 0.1s ease;
+}
+
+.chat-form button:active {
+  box-shadow: none;
+  transform: translateY(4px);
+}
+
+/* 스피너 */
+.spinner {
+  margin-top: 8px;
+  width: 28px;
+  height: 28px;
+  border: 4px solid #fff;
+  border-top-color: #a044ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* 스피너 회전 애니메이션 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

@@ -34,7 +34,7 @@ def supervisor_node(state: dict) -> Command:
     state["selected_agent"] = selected
 
     # Command 객체 반환: 다음 노드로 전이하며 업데이트된 상태 전달
-    return Command(goto="supervisor", update=state)    # goto는 다음으로 이동할 노드 / update는 현재의 상태
+    return Command(goto=next_node, update=state)    # goto는 다음으로 이동할 노드 / update는 현재의 상태
 
 
 # Brokerage 노드 함수: 증권 관련 질문을 처리
@@ -48,7 +48,7 @@ def brokerage_node(state: dict) -> Command:
     )
 
     # 처리 후 supervisor로 전이 (후속 질문을 위해)
-    return Command(goto="supervisor", update=state)
+    return Command(goto=END, update=state)
 
 
 # Portfolio 노드 함수: 포트폴리오 관련 질문을 처리
@@ -68,7 +68,7 @@ def portfolio_node(state: dict) -> Command:
 # 그래프 빌더 함수: 초기 상태와 노드를 구성합니다.
 def build_graph():
     # 초기 상태: 대화 기록 및 최신 질문을 포함하는 사전
-    initial_state = {"latest_query": "", "messages": []}
+    initial_state = {"latest_query": "", "messages": []}    # 안 쓰는 건...가?
     builder = StateGraph(dict)  # 점검필요...
 
     # START에서 supervisor로 전이
@@ -81,10 +81,11 @@ def build_graph():
     builder.add_node("portfolio", portfolio_node)
 
     # 필요 시 supervisor에서 END로의 에지 추가 (종료 조건)
-    builder.add_edge("supervisor", "supervisor")
+    builder.add_edge("supervisor", END)
 
     return builder.compile()
 
 
 # 최종 그래프 객체 (전체 대화 흐름)
 graph = build_graph()
+
