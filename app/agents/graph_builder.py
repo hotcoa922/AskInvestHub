@@ -4,7 +4,7 @@ from langchain.schema import HumanMessage, AIMessage
 from agents.supervisor import supervisor_agent, SupervisorRequest
 from agents.brokerage_agent import process_brokerage_agent
 from agents.portfolio_agent import process_portfolio_agent
-from pydantic import BaseModel
+
 
 
 # Supervisor 노드 함수: 사용자의 최신 질문을 분석하여 적합한 에이전트를 결정
@@ -16,7 +16,6 @@ def supervisor_node(state: dict) -> Command:
     supervisor_req = SupervisorRequest(query=query)
     result = supervisor_agent(supervisor_req)    # result에는 선택된 에이전트와 그 결과가 포함되어 있음
     selected = result.get("selected_agent", "")
-
 
 
     # 대화 메시지 업데이트: 대화 메시지에 supervisor_agent의 응답(예: result["result"])를 추가
@@ -35,7 +34,7 @@ def supervisor_node(state: dict) -> Command:
     state["selected_agent"] = selected
 
     # Command 객체 반환: 다음 노드로 전이하며 업데이트된 상태 전달
-    return Command(goto=next_node, update=state)    # goto는 다음으로 이동할 노드 / update는 현재의 상태
+    return Command(goto="supervisor", update=state)    # goto는 다음으로 이동할 노드 / update는 현재의 상태
 
 
 # Brokerage 노드 함수: 증권 관련 질문을 처리
@@ -49,7 +48,7 @@ def brokerage_node(state: dict) -> Command:
     )
 
     # 처리 후 supervisor로 전이 (후속 질문을 위해)
-    return Command(goto=END, update=state)
+    return Command(goto="supervisor", update=state)
 
 
 # Portfolio 노드 함수: 포트폴리오 관련 질문을 처리
@@ -82,7 +81,7 @@ def build_graph():
     builder.add_node("portfolio", portfolio_node)
 
     # 필요 시 supervisor에서 END로의 에지 추가 (종료 조건)
-    builder.add_edge("supervisor", END)
+    builder.add_edge("supervisor", "supervisor")
 
     return builder.compile()
 
