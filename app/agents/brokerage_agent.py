@@ -54,8 +54,8 @@ def load_vector_store(save_path: str, embeddings) -> FAISS:
 
 # 직접 실행될 때만 해당 코드 블록이 실행
 if __name__ == "__main__":
-    pdf_directory = "data/legal_docs"
-    vector_store_dir = "data/vector_store/faiss_index"
+    pdf_directory = ".data/legal_docs"
+    vector_store_dir = ".data/vector_store/faiss_index"
 
     if os.path.exists(vector_store_dir):
         print("저장된 벡터 DB 로드 중...")

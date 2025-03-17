@@ -42,7 +42,7 @@ chat_llm = AzureChatOpenAI(
     api_version="2024-08-01-preview",
 )
 
-from agents.brokerage_agent import process_law_agent
+from agents.brokerage_agent import process_brokerage_agent
 from agents.portfolio_agent import process_portfolio_agent
 
 def determine_agent(query: str) -> str:
