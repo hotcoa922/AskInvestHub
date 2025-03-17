@@ -1,15 +1,20 @@
 from fastapi import FastAPI
 
-
-from api import question_router
 from fastapi.middleware.cors import CORSMiddleware
 
+import logging
+
+# 로그 설정
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+logger.info("FastAPI 서버 시작됨")
 
 # FastAPI 애플리케이션 인스턴스 생성
 app = FastAPI(
     title="Ask Invest Hub 서비스(AIH)",
     description="에이전트 기반 AI 서비스 (법률 및 포트폴리오 분석)",
-    version="0.4.0"
+    version="0.7.0"
 )
 
 # 기본 엔드포인트: API 테스트용
