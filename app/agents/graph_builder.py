@@ -1,16 +1,23 @@
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.types import Command
 from langchain.schema import HumanMessage, AIMessage
 from agents.supervisor import supervisor_agent, SupervisorRequest
 from agents.brokerage_agent import process_brokerage_agent
 from agents.portfolio_agent import process_portfolio_agent
+from typing import List
 
+import logging
+logger = logging.getLogger(__name__)
 
+class State(MessagesState):
+    query: str
+    selected_agent: str
+    messages: List
 
 # Supervisor 노드 함수: 사용자의 최신 질문을 분석하여 적합한 에이전트를 결정
-def supervisor_node(state: dict) -> Command:
-    # state에 저장된 최신 질문을 가져옴 -> 사용자의 최신 질문 가져옴
-    query = state.get("latest_query", "")
+def supervisor_node(state) -> Command:
+
+    query = state["messages"][0][-1] # request.query: str
 
     # SupervisorRequest 모델로 변환하여 supervisor_agent 함수를 호출
     supervisor_req = SupervisorRequest(query=query)
@@ -39,13 +46,14 @@ def supervisor_node(state: dict) -> Command:
 
 # Brokerage 노드 함수: 증권 관련 질문을 처리
 def brokerage_node(state: dict) -> Command:
-    query = state.get("latest_query", "")
+    query = state["messages"][0][-1]
     result = process_brokerage_agent(query)
 
     # 응답을 메시지로 업데이트 (여기서는 문자열로 변환)
     state.setdefault("messages", []).append(
         AIMessage(content=str(result))
     )
+    logger.info(f"brokerage: {state}")
 
     # 처리 후 supervisor로 전이 (후속 질문을 위해)
     return Command(goto=END, update=state)
@@ -68,8 +76,8 @@ def portfolio_node(state: dict) -> Command:
 # 그래프 빌더 함수: 초기 상태와 노드를 구성합니다.
 def build_graph():
     # 초기 상태: 대화 기록 및 최신 질문을 포함하는 사전
-    initial_state = {"latest_query": "", "messages": []}    # 안 쓰는 건...가?
-    builder = StateGraph(dict)  # 점검필요...
+    # initial_state = {"latest_query": "", "messages": []}
+    builder = StateGraph(State)
 
     # START에서 supervisor로 전이
     builder.add_edge(START, "supervisor")   # add_edge를 통해 start->supervisor 노드로 바로 이동
