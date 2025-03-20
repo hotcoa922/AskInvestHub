@@ -10,6 +10,7 @@ WORKDIR /app
 
 # 의존성 파일 복사 및 설치
 COPY requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 # app 폴더 내부의 코드만 /app 디렉터리에 복사

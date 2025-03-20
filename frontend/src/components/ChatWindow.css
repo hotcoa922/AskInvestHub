@@ -1,17 +1,12 @@
-/* 전체 컨테이너:
-   - 파스텔 그라데이션 배경
-   - 모서리 곡률을 크게 주려면 최상위 컨테이너 대신 내부 요소에 주는 게 일반적.
-   - 여기서는 화면 전체가 배경이므로 border-radius는 따로 주지 않음.
-*/
+/* 전체 컨테이너 (가로 폭 600px로 늘림) */
 .chat-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  max-width: 500px;
+  max-width: 600px; /* 기존 500px에서 600px로 변경 */
   margin: 0 auto;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
-  /* 위: 연보라+핑크 파스텔 그라데이션 */
 }
 
 /* 헤더 영역 */
@@ -21,7 +16,6 @@
   justify-content: center;
   position: relative;
   background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
-  /* 헤더도 살짝 그라데이션 */
   padding: 12px;
   border-bottom: 1px solid rgba(0,0,0,0.05);
   border-top-left-radius: 16px;
@@ -42,7 +36,7 @@
   top: 12px;
   width: 24px;
   height: 24px;
-  background: #fbc2eb; /* 아이콘 배경 */
+  background: #fbc2eb;
   border-radius: 50%;
   color: #fff;
   font-weight: bold;
@@ -51,9 +45,7 @@
   justify-content: center;
 }
 
-/* 채팅창:
-   - 안쪽에 곡률+투명도+그림자
-*/
+/* 채팅창 (반투명 + 곡률 + 그림자) */
 .chat-window {
   flex: 1;
   overflow-y: auto;
@@ -65,7 +57,7 @@
   backdrop-filter: blur(8px);
 }
 
-/* 메시지 영역 */
+/* 메시지 레이아웃 */
 .chat-message {
   display: flex;
   align-items: flex-start;
@@ -89,10 +81,7 @@
   object-fit: cover;
 }
 
-/* 말풍선:
-   - 파스텔 톤 or 살짝 반투명
-   - 넉넉한 border-radius
-*/
+/* 말풍선 (글자 크기 줄이기: 13px) */
 .message-bubble {
   max-width: 65%;
   padding: 12px 16px;
@@ -102,13 +91,12 @@
   white-space: pre-wrap;
   background: #ffffff;
   color: #333;
+  font-size: 13px; /* 글자 크기 줄임 */
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* 사용자 말풍선: 다른 파스텔 톤 */
 .chat-message.user .message-bubble {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  /* 연한 회색-하늘색 파스텔 그라데이션 */
   color: #333;
 }
 

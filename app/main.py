@@ -1,16 +1,31 @@
 from fastapi import FastAPI
 
-
-from api import question_router
 from fastapi.middleware.cors import CORSMiddleware
 
+import logging
+
+# 로그 설정
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+logger.info("FastAPI 서버 시작됨")
 
 # FastAPI 애플리케이션 인스턴스 생성
 app = FastAPI(
     title="Ask Invest Hub 서비스(AIH)",
     description="에이전트 기반 AI 서비스 (법률 및 포트폴리오 분석)",
-    version="0.4.0"
+    version="0.7.0"
 )
+
+# 벡터 DB 초기화 함수 임포트
+from agents.brokerage_agent import initialize_vector_store
+
+# 서버 시작 전 벡터 DB 초기화 (startup 이벤트)
+@app.on_event("startup")
+async def startup_event():
+    logger.info("서버 시작 전 벡터 DB 초기화 시작")
+    initialize_vector_store()
+    logger.info("서버 시작 전 벡터 DB 초기화 완료")
 
 # 기본 엔드포인트: API 테스트용
 @app.get("/")
