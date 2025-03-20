@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './ChatWindow.css';
 
+import aiAvatar from '../assets/ai.jpg';
+import humanAvatar from '../assets/human.jpg';
+
 const ChatWindow = () => {
-  // 대화 내역: { sender: 'user' | 'ai', content: string, finalTime?: number } 배열
   const [conversation, setConversation] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
-  const [timerId, setTimerId] = useState(null);
+
+  const chatWindowRef = useRef(null);
+  const timerIdRef = useRef(null);
+  const startTimeRef = useRef(null);
+
+  // 새 메시지 추가 시 자동 스크롤
+  useEffect(() => {
+    if (chatWindowRef.current) {
+      chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
+    }
+  }, [conversation]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,38 +32,45 @@ const ChatWindow = () => {
       { sender: 'user', content: query }
     ]);
 
-    // 로딩 상태 초기화
+    // 로딩 상태 및 시간 초기화
     setLoading(true);
     setLoadingTime(0);
+    startTimeRef.current = Date.now();
 
-    // 1초마다 loadingTime을 1씩 증가
-    const id = setInterval(() => {
-      setLoadingTime((prev) => prev + 1);
+    // 1초마다 경과 시간 갱신
+    timerIdRef.current = setInterval(() => {
+      const secondsElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      setLoadingTime(secondsElapsed);
     }, 1000);
-    setTimerId(id);
 
     try {
-      // API 호출
+      // 백엔드 호출
       const response = await axios.post('http://localhost:8000/agent/ask', { query });
-      // 예) response.data.messages = [{ content: "{\"input\": \"...\", \"output\": \"...\"}" }, ...]
       const messages = response.data.messages;
       const aiRawContent = messages[messages.length - 1].content;
 
-      // JSON 파싱 후 output 필드만 추출
+      // 응답 시점에서 최종 경과시간을 직접 계산 (정확도 향상)
+      const finalSeconds = Math.floor((Date.now() - startTimeRef.current) / 1000);
+
       let displayContent = aiRawContent;
       try {
+        // {"input":"...","output":"..."} 구조 가정
         const parsed = JSON.parse(aiRawContent);
         if (parsed.output) {
           displayContent = parsed.output;
         }
       } catch (err) {
-        // JSON이 아니면 그대로 사용
+        // JSON 파싱 실패 시 원본 그대로 사용
       }
 
-      // AI 메시지에 최종 소요 시간(finalTime)을 추가
+      // AI 메시지에 finalTime을 저장
       setConversation((prev) => [
         ...prev,
-        { sender: 'ai', content: displayContent, finalTime: loadingTime }
+        {
+          sender: 'ai',
+          content: displayContent,
+          finalTime: finalSeconds
+        }
       ]);
     } catch (error) {
       console.error('API 호출 오류:', error);
@@ -61,33 +80,49 @@ const ChatWindow = () => {
       ]);
     } finally {
       setLoading(false);
-      clearInterval(id);
-      setTimerId(null);
+      clearInterval(timerIdRef.current);
+      timerIdRef.current = null;
     }
 
+    // 입력창 초기화
     setQuery('');
   };
 
   return (
     <div className="chat-container">
-      <div className="chat-window">
-        {conversation.map((msg, index) => (
-          <div key={index} className={`chat-message ${msg.sender}`}>
-            <div className="message-bubble">
-              {msg.content}
-            </div>
-            {/* AI 메시지에 finalTime이 존재하면 3D 버튼 표시 */}
-            {msg.sender === 'ai' && msg.finalTime != null && (
-              <button className="final-time-button">
-                최종 소요시간 - {msg.finalTime}초
-              </button>
-            )}
-          </div>
-        ))}
+      {/* 헤더 영역 */}
+      <header className="chat-header">
+        <h2>AIH</h2>
+        <div className="header-question">?</div>
+      </header>
 
-        {/* 로딩 중이면 스피너와 경과 시간 표시 */}
+      {/* 채팅창 영역 */}
+      <div className="chat-window" ref={chatWindowRef}>
+        {conversation.map((msg, index) => {
+          const isUser = msg.sender === 'user';
+          const avatar = isUser ? humanAvatar : aiAvatar;
+          return (
+            <div key={index} className={`chat-message ${isUser ? 'user' : 'ai'}`}>
+              {/* AI는 왼쪽, USER는 오른쪽 */}
+              {!isUser && <img src={avatar} alt="avatar" className="avatar" />}
+              <div className="message-bubble">
+                {msg.content}
+                {/* AI 메시지에만 최종 소요시간 버튼 표시 */}
+                {msg.sender === 'ai' && msg.finalTime != null && (
+                  <button className="final-time-button">
+                    최종 소요시간 - {msg.finalTime}초
+                  </button>
+                )}
+              </div>
+              {isUser && <img src={avatar} alt="avatar" className="avatar" />}
+            </div>
+          );
+        })}
+
+        {/* 로딩 중 표시 */}
         {loading && (
           <div className="chat-message ai">
+            <img src={aiAvatar} alt="avatar" className="avatar" />
             <div className="message-bubble loading-bubble">
               로딩 중... ({loadingTime}초)
               <div className="spinner" />
@@ -96,6 +131,7 @@ const ChatWindow = () => {
         )}
       </div>
 
+      {/* 입력 폼 */}
       <form className="chat-form" onSubmit={handleSubmit}>
         <input
           type="text"
@@ -105,7 +141,7 @@ const ChatWindow = () => {
           disabled={loading}
         />
         <button type="submit" disabled={loading}>
-          전송
+          보내기
         </button>
       </form>
     </div>

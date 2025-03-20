@@ -20,10 +20,10 @@ class UserQuestion(BaseModel):
 @router.post("/ask")
 async def ask_question(request: UserQuestion):
     try:
-        state = {"messages": [], "latest_query": request.query} # 초기 state 생성
+        # state = {"messages": [], "latest_query": request.query} # 초기 state 생성
         logger.info(f"📨 [INFO] /ask 엔드포인트 호출됨: {request.query}")
-        logger.debug(f"🔍 [DEBUG] graph 실행 전 state: {state}")
-        final_state = graph.invoke(state)
+        # logger.debug(f"🔍 [DEBUG] graph 실행 전 state: {state}")
+        final_state = graph.invoke({"messages": [("human", request.query)]})
         logger.debug(f"✅ [DEBUG] graph 실행 후 state: {final_state}")
         result = final_state
         return result
