@@ -61,17 +61,17 @@ def brokerage_node(state: dict) -> Command:
 
 # Portfolio 노드 함수: 포트폴리오 관련 질문을 처리
 def portfolio_node(state: dict) -> Command:
-    query = state.get("latest_query", "")
-    # portfolio_agent는 구조화된 입력을 요구하므로 state에서 portfolio_data를 읽습니다.
-    portfolio_data = state.get("portfolio_data", "")
-    result = process_portfolio_agent({"query": query, "portfolio_data": portfolio_data})
+    query = state["messages"][0][-1]
+    result = process_portfolio_agent(query)
 
+    # 응답을 메시지로 업데이트 (여기서는 문자열로 변환)
     state.setdefault("messages", []).append(
         AIMessage(content=str(result))
     )
+    logger.info(f"portfolio: {state}")
 
+    # 처리 후 supervisor로 전이 (후속 질문을 위해)
     return Command(goto=END, update=state)
-
 
 # 그래프 빌더 함수: 초기 상태와 노드를 구성합니다.
 def build_graph():

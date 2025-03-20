@@ -1,9 +1,13 @@
+import time
+
 from langchain_openai import AzureChatOpenAI
 from langchain.chains import LLMChain
+from openai import RateLimitError
 
 from prompts.prompts import LEGAL_COMPLIANCE_PROMPT, FEE_SERVICE_PROMPT #미리 정의한 프롬프트 가져오기
 
-from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O, AOAI_DEPLOY_EMBED_3_LARGE
+from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O, AOAI_DEPLOY_EMBED_3_LARGE, \
+    AOAI_DEPLOY_EMBED_3_SMALL
 
 import logging
 
@@ -39,38 +43,38 @@ vector_store = None
 
 def preprocess_legal_text(text: str) -> str:
     """
-    법률 문서 전처리 함수:
-    '제...조' 또는 '제...항' 패턴 앞뒤에 줄바꿈을 추가하여 구조를 분리합니다.
+    '제...조' 또는 '제...항' 패턴 앞뒤에 줄바꿈을 추가하고,
+    '제1조\n(목적)' 같은 경우를 '제1조(목적)'로 바꿔주는 전처리.
     """
-    text = re.sub(r'(제\s*\d+\s*(조|항))', r'\n\1\n', text)
-    text = re.sub(r'\n+', '\n', text)  # 과도한 줄바꿈 정리
+    # '제N조' / '제N항' 앞뒤로 줄바꿈
+    text = re.sub(r'(제\s*\d+(?:의\d+)?\s*(?:조|항))', r'\n\1\n', text)
+
+    # '조\n(' -> '조(' 식으로
+    # '항\n(' -> '항(' 식으로 줄바꿈 제거
+    text = re.sub(r'(조|항)\n\(', r'\1(', text)
+
+    # 여러 줄바꿈 -> 1개로
+    text = re.sub(r'\n+', '\n', text)
     return text
 
 
-def split_by_articles(text: str) -> list:
+def split_by_article(text: str) -> list:
     """
-    법률 문서를 '제...조' 또는 '제...항' 단위로 분할하는 함수.
-    각 청크는 하나의 조항 또는 항으로 구성됩니다.
+    '제N조(...)'를 기준으로 청크를 분할.
     """
-    # 전처리: 법률 텍스트 구조 강조
     text = preprocess_legal_text(text)
-    # '제' 다음에 숫자와 '조' 또는 '항'이 나오는 부분을 기준으로 분할 (lookahead 사용)
-    pattern = r'(?=(제\s*\d+\s*(조|항)))'
-    parts = re.split(pattern, text)
 
-    # 캡처 그룹을 재조합하여 청크 생성
-    chunks = []
-    current = ""
-    for part in parts:
-        if re.match(r'제\s*\d+\s*(조|항)', part):
-            if current:
-                chunks.append(current.strip())
-            current = part  # 새 청크 시작
-        else:
-            current += part
-    if current:
-        chunks.append(current.strip())
-    return chunks
+    # DOTALL 로 줄바꿈 포함, "제...조(...)" 잡기
+    # '조' 뒤에 괄호까지 포함. 혹은 '항'도 동일하게
+    # (예: 제12조(목적), 제10조의2(…))
+    pattern = r'(제\s*\d+조(?:의\d+)?\([^)]*\).+?)(?=제\s*\d+조(?:의\d+)?\(|$)'
+    matches = re.findall(pattern, text, flags=re.DOTALL)
+
+    # 만약 아무것도 안 잡히면, 문서 통째로 반환
+    if not matches:
+        return [text.strip()]
+
+    return [m.strip() for m in matches]
 
 
 
@@ -78,18 +82,19 @@ def initialize_vector_store():
     """
     서버 시작 전에 벡터 DB를 초기화(로드 또는 생성)하는 함수.
     """
+    global vector_store
     pdf_directory = "/data/legal_docs"  # 실제 PDF 문서 경로
-    vector_store_dir = ".data/vector_store/faiss_index"
+    vector_store_dir = "/data/vector_store/faiss_index"  # 절대경로로 지정
 
     if os.path.exists(vector_store_dir):
         logger.info("저장된 벡터 DB 로드 중...")
         embeddings = AzureOpenAIEmbeddings(
-            model=AOAI_DEPLOY_EMBED_3_LARGE,
+            model=AOAI_DEPLOY_EMBED_3_SMALL,
             openai_api_version="2024-02-01",
             api_key=AOAI_API_KEY,
             azure_endpoint=AOAI_ENDPOINT
         )
-        vector_store = FAISS.load_local(vector_store_dir, embeddings)
+        vector_store = FAISS.load_local(vector_store_dir, embeddings, allow_dangerous_deserialization=True)
         logger.info("벡터 DB 로드 완료.")
     else:
         logger.info("벡터 DB 구축 중...")
@@ -98,7 +103,6 @@ def initialize_vector_store():
             for filename in os.listdir(pdf_directory):
                 if filename.lower().endswith(".pdf"):
                     file_path = os.path.join(pdf_directory, filename)
-                    # 파일 크기가 0바이트이면 건너뜁니다.
                     if os.stat(file_path).st_size == 0:
                         logger.warning("빈 PDF 파일 건너뛰기: %s", file_path)
                         continue
@@ -108,25 +112,51 @@ def initialize_vector_store():
                     except Exception as e:
                         logger.warning("PDF 로드 중 오류 발생, 파일 무시: %s, 오류: %s", file_path, e)
                         continue
+
                     for doc in docs:
-                        chunks = split_by_articles(doc.page_content)
+                        chunks = split_by_article(doc.page_content)
                         for chunk in chunks:
-                            documents.append(Document(page_content=chunk, metadata=doc.metadata))
+                            # 여기서 "제N조(…)" 찾기 (조 뒤 괄호까지)
+                            # 줄바꿈 때문에 안 잡히지 않도록 전처리에서 미리 \n제 -> 전부 한 줄로
+                            match = re.search(r'(제\s*\d+조(?:의\d+)?\([^)]*\))', chunk)
+                            if match:
+                                article_name = match.group(1).strip()
+                            else:
+                                article_name = "UNKNOWN_ARTICLE"
+
+                            documents.append(
+                                Document(
+                                    page_content=chunk,
+                                    metadata={"source": f"{file_path} - {article_name}"}
+                                )
+                            )
+
             logger.info("문서 전처리 완료. 총 %d개 청크", len(documents))
+            logger.info(documents)
         else:
             logger.warning("PDF 디렉토리가 존재하지 않습니다: %s", pdf_directory)
+
         embeddings = AzureOpenAIEmbeddings(
             model=AOAI_DEPLOY_EMBED_3_LARGE,
             openai_api_version="2024-02-01",
             api_key=AOAI_API_KEY,
-            azure_endpoint=AOAI_ENDPOINT
+            azure_endpoint=AOAI_ENDPOINT,
+            dimensions=300
         )
+        logger.info(f"확인용: ")
         vector_store = FAISS.from_documents(documents, embeddings)
         vector_store.save_local(vector_store_dir)
         logger.info("벡터 DB 구축 완료.")
     logger.info("최종: 벡터 DB 구축/로드 완료.")
-    return  # 실제로 vector_store를 전역 변수에 저장하거나 반환할 수 있음.
 
+# --- AzureChatOpenAI 인스턴스 생성 ---
+
+chat_llm = AzureChatOpenAI(
+    azure_endpoint=AOAI_ENDPOINT,
+    api_key=AOAI_API_KEY,
+    azure_deployment=AOAI_DEPLOY_GPT4O,
+    api_version="2024-08-01-preview",
+)
 
 
 # AzureChatOpenAI 인스턴스 생성
@@ -163,11 +193,8 @@ def legal_compliance(query: str) -> str:
         input_variables=["question"]
     )
 
-    logger.info("legal_compliance 작동, 질문: %s", query)
     formatted_prompt = prompt_template.format(question=query)
-
     response = chat_llm.invoke(formatted_prompt)
-    logger.info("LLM 응답: %s", response.content.strip())
     return response.content.strip()
 
 
@@ -200,8 +227,7 @@ def rag_argumentation(query: str) -> str:
         return "No augmented data (vector_store not initialized)."
 
     # 1. 유사 문서 검색
-    # k=3 정도로 상위 3개 문서를 검색해 예시로 사용
-    similar_docs = vector_store.similarity_search(query, k=3)
+    similar_docs = vector_store.similarity_search(query, k=5)
     if not similar_docs:
         logger.info("유사 문서가 없습니다.")
         return "No relevant documents found."
@@ -210,7 +236,11 @@ def rag_argumentation(query: str) -> str:
     # 간단히 본문만 합치는 예시 (실제론 LLM Summarization Chain 등 사용 가능)
     combined_text = ""
     for i, doc in enumerate(similar_docs, start=1):
-        snippet = doc.page_content[:300]  # 일부만 잘라내거나 원하는 만큼
+        snippet = doc.page_content[:3000]  # 일부만 잘라내거나 원하는 만큼
+
+        # 로그에 간략히 출력 (메타데이터 + 스니펫 앞부분)
+        logger.info(f"[RAG] 문서 {i} (metadata={doc.metadata}): {snippet[:30000]}...")
+
         combined_text += f"\n--- 문서 {i} ---\n{snippet}\n"
 
     # 최종 결과
@@ -227,8 +257,9 @@ def process_brokerage_agent(query: str) -> str:
     tools = [legal_compliance, info_service]  # 두 도구만 사용
     custom_prefix = """
     You have access to the following tools:
-    - legal_compliance(query: str) -> str: Generates a detailed legal analysis using the provided legal compliance prompt.
-      The final answer MUST strictly follow the format below:
+    - legal_compliance(query: str) -> str: Generates a detailed legal analysis using the provided legal_compliance_prompt.
+      당신은 최대한 상세하게 답변을 해야합니다. The final answer MUST strictly follow the format below:
+      
 
       [문제상황분석]
       질문에서 제기된 문제 상황을 명확하게 분석하고, 주요 이슈와 이해관계자, 상황의 배경을 구체적으로 서술합니다.
@@ -252,6 +283,7 @@ def process_brokerage_agent(query: str) -> str:
       전체 응답의 핵심 내용을 한두 문장으로 간략하게 요약합니다.
 
     - info_service(query: str) -> str: Generates a detailed analysis of fee and service information.
+      답변을 간추리지 않고 최대한 객관적이고 상세하게 작성할 것.
 
     Your task is to automatically choose the appropriate tool based solely on the user's input. If legal_compliance is chosen, the final answer MUST strictly adhere to the above format.
     """

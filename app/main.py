@@ -17,15 +17,15 @@ app = FastAPI(
     version="0.7.0"
 )
 
-# # 벡터 DB 초기화 함수 임포트 (broker_agent.py에 정의된 함수)
-# from agents.brokerage_agent import initialize_vector_store
-#
-# # 서버 시작 시 벡터 DB 초기화 (startup 이벤트)
-# @app.on_event("startup")
-# async def startup_event():
-#     logger.info("서버 시작 전 벡터 DB 초기화 시작")
-#     initialize_vector_store()
-#     logger.info("서버 시작 전 벡터 DB 초기화 완료")
+# 벡터 DB 초기화 함수 임포트
+from agents.brokerage_agent import initialize_vector_store
+
+# 서버 시작 전 벡터 DB 초기화 (startup 이벤트)
+@app.on_event("startup")
+async def startup_event():
+    logger.info("서버 시작 전 벡터 DB 초기화 시작")
+    initialize_vector_store()
+    logger.info("서버 시작 전 벡터 DB 초기화 완료")
 
 # 기본 엔드포인트: API 테스트용
 @app.get("/")

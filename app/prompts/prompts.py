@@ -13,8 +13,8 @@ FEE_SERVICE_PROMPT = """
 
 # 종목에 대한 재무제표 분석 프롬프트 템플릿
 FINANCIAL_STATEMENT_PROMPT = """
-
-
+아래 질문에 기반하여 관련 답변을 해주세요.
+질문: {question}
 """
 
 

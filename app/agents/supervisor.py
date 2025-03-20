@@ -66,6 +66,7 @@ def supervisor_agent(request: SupervisorRequest) -> dict:
             "error": f"입력 질문에 대해 적절한 에이전트를 결정할 수 없습니다. (분류 결과: {agent_type})"
         }
 
+    logger.info(f"✅ [INFO] 선택된 에이전트: {selected_agent}")
     return {
         "selected_agent": selected_agent,
         "result": request.query

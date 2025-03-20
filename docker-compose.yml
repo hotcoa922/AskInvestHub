@@ -8,6 +8,8 @@ services:
       - "${PORT:-8000}:8000"
     volumes:
       - ./static:/static
+      - ./data/legal_docs:/data/legal_docs   # PDF 문서가 있는 호스트 디렉터리 마운트
+      - ./data/vector_store:/data/vector_store   # 벡터 DB 저장 디렉터리를 호스트에 마운트
     # 필요시 의존성이 있다면 아래처럼 depends_on 등 추가
     # depends_on:
     #   - some-other-service
