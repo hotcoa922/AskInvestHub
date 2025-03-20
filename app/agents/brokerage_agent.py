@@ -1,22 +1,17 @@
-import time
-
+from langchain_core.prompts import MessagesPlaceholder, ChatPromptTemplate, PromptTemplate
 from langchain_openai import AzureChatOpenAI
-from langchain.chains import LLMChain
-from openai import RateLimitError
+from langchain.chains import LLMChain, llm
 
 from prompts.prompts import LEGAL_COMPLIANCE_PROMPT, FEE_SERVICE_PROMPT #미리 정의한 프롬프트 가져오기
 
-from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O, AOAI_DEPLOY_EMBED_3_LARGE, \
-    AOAI_DEPLOY_EMBED_3_SMALL
+from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O, AOAI_DEPLOY_EMBED_3_LARGE
 
 import logging
 
 # 로그 설정
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# 로깅 기본 설정 (필요에 따라 포맷 및 출력 대상 조정 가능)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 called_tools = []
 
@@ -89,13 +84,17 @@ def initialize_vector_store():
     if os.path.exists(vector_store_dir):
         logger.info("저장된 벡터 DB 로드 중...")
         embeddings = AzureOpenAIEmbeddings(
-            model=AOAI_DEPLOY_EMBED_3_SMALL,
+            model=AOAI_DEPLOY_EMBED_3_LARGE,
             openai_api_version="2024-02-01",
             api_key=AOAI_API_KEY,
             azure_endpoint=AOAI_ENDPOINT
         )
-        vector_store = FAISS.load_local(vector_store_dir, embeddings, allow_dangerous_deserialization=True)
-        logger.info("벡터 DB 로드 완료.")
+        try:
+            vector_store = FAISS.load_local(vector_store_dir, embeddings, allow_dangerous_deserialization=True)
+            logger.info(f"벡터 DB 로드 완료 (차원: {vector_store.index.d})")  # 추가된 로그
+        except Exception as e:
+            logger.error(f"벡터 DB 로드 실패: {e}, 새로 생성 중...")
+
     else:
         logger.info("벡터 DB 구축 중...")
         documents = []
@@ -141,9 +140,7 @@ def initialize_vector_store():
             openai_api_version="2024-02-01",
             api_key=AOAI_API_KEY,
             azure_endpoint=AOAI_ENDPOINT,
-            dimensions=300
         )
-        logger.info(f"확인용: ")
         vector_store = FAISS.from_documents(documents, embeddings)
         vector_store.save_local(vector_store_dir)
         logger.info("벡터 DB 구축 완료.")
@@ -151,12 +148,6 @@ def initialize_vector_store():
 
 # --- AzureChatOpenAI 인스턴스 생성 ---
 
-chat_llm = AzureChatOpenAI(
-    azure_endpoint=AOAI_ENDPOINT,
-    api_key=AOAI_API_KEY,
-    azure_deployment=AOAI_DEPLOY_GPT4O,
-    api_version="2024-08-01-preview",
-)
 
 
 # AzureChatOpenAI 인스턴스 생성
@@ -209,6 +200,7 @@ def info_service(query: str) -> str:
         input_variables=["question"]
     )
     logger.info("info service 작동")
+    logger.info(f"{prompt_template}")
     formatted_prompt = prompt_template.format(question=query)
     response = chat_llm.invoke(formatted_prompt)
     return response.content.strip()
@@ -226,8 +218,23 @@ def rag_argumentation(query: str) -> str:
         logger.warning("vector_store가 초기화되지 않았습니다. RAG를 건너뜁니다.")
         return "No augmented data (vector_store not initialized)."
 
-    # 1. 유사 문서 검색
-    similar_docs = vector_store.similarity_search(query, k=5)
+    try:
+        # ✅ 쿼리 벡터 차원 확인
+        query_vector = vector_store.embedding_function.embed_query(query)
+        if len(query_vector) != vector_store.index.d:
+            logger.error(f"벡터 차원 불일치! FAISS={vector_store.index.d}, Query={len(query_vector)}")
+            return "Vector dimension mismatch error."
+
+        # 1. 유사 문서 검색
+        similar_docs = vector_store.similarity_search(query, k=5)
+    except AssertionError as e:
+        logger.error(f"FAISS 벡터 검색 오류 발생: {e}")
+        return "Vector search error."
+    except Exception as e:
+        logger.error(f"RAG 검색 중 예외 발생: {e}")
+        return "RAG processing error."
+
+
     if not similar_docs:
         logger.info("유사 문서가 없습니다.")
         return "No relevant documents found."
@@ -249,64 +256,37 @@ def rag_argumentation(query: str) -> str:
     return result
 
 
-from langchain.agents import initialize_agent, AgentType
-from langchain.prompts import PromptTemplate
-
-
 def process_brokerage_agent(query: str) -> str:
-    tools = [legal_compliance, info_service]  # 두 도구만 사용
-    custom_prefix = """
-    You have access to the following tools:
-    - legal_compliance(query: str) -> str: Generates a detailed legal analysis using the provided legal_compliance_prompt.
-      당신은 최대한 상세하게 답변을 해야합니다. The final answer MUST strictly follow the format below:
-      
-
-      [문제상황분석]
-      질문에서 제기된 문제 상황을 명확하게 분석하고, 주요 이슈와 이해관계자, 상황의 배경을 구체적으로 서술합니다.
-
-      [관련 법]
-      1. [법률명]: 해당 법률의 주요 내용과 질문과의 관련성을 간단히 설명
-      2. [법률명]: 관련 조항 및 적용 가능성 등
-      3. [법률명]: 추가로 고려해야 할 법률적 측면
-
-      [메인]
-      문제 상황에 대한 전반적인 논리 전개 및 분석을 수행합니다. 관련 법률의 적용, 판례, 해석 등을 종합하여 주장의 근거를 체계적으로 서술합니다.
-      최대한 상세하고 많은 내용을 담습니다.
-
-      [결론]
-      전체 분석을 토대로 내릴 수 있는 최종 판단과 권고사항을 명확하게 제시합니다.
-
-      [추가고려점]
-      추가적으로 고려해야 할 법률적, 실무적, 정책적 사항이나 주의사항이 있다면 기재합니다.
-
-      [요약]
-      전체 응답의 핵심 내용을 한두 문장으로 간략하게 요약합니다.
-
-    - info_service(query: str) -> str: Generates a detailed analysis of fee and service information.
-      답변을 간추리지 않고 최대한 객관적이고 상세하게 작성할 것.
-
-    Your task is to automatically choose the appropriate tool based solely on the user's input. If legal_compliance is chosen, the final answer MUST strictly adhere to the above format.
+    """
+     LLM에게 적절한 도구를 선택하도록 요청
+     선택된 도구를 직접 실행
     """
 
-    agent = initialize_agent(
-        tools,
-        chat_llm,
-        agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=True,
-        agent_kwargs={"prefix": custom_prefix}
-    )
+    #  도구 선택을 위한 LLM 프롬프트 (JSON 없이)
+    tool_selection_prompt = f"""
+    아래의 질문을 분석하여, 적절한 도구를 선택하세요.
 
-    result = agent.invoke({"input": query})
+    질문: "{query}"
 
+    ### 사용 가능한 도구:
+    - info_service: 금융 서비스 및 수수료 정보를 제공합니다.
+    - legal_compliance: 법률 및 규제 적합성을 분석합니다.
 
-    if isinstance(result, dict):
-        if "content" in result:
-            return result["content"].strip()
-        elif "output" in result:
-            return result["output"].strip()
-        else:
-            raise ValueError("결과 딕셔너리에 'content' 또는 'output' 키가 없습니다.")
-    elif isinstance(result, str):
-        return result.strip()
+    **다음과 같은 형식으로만 응답하세요 (예시):**
+    - 선택: info_service
+    - 선택: legal_compliance
+    """
+
+    # LLM에게 도구 선택 요청
+    response = chat_llm.invoke(tool_selection_prompt)
+    selected_tool = response.content.strip().lower()  # 소문자로 변환하여 비교
+
+    logger.info(f"도구 선택 응답: {selected_tool}")
+
+    # LLM이 선택한 도구 실행 (JSON 파싱 없이 간단한 조건문 활용)
+    if "info_service" in selected_tool:
+        return info_service.invoke(query)
+    elif "legal_compliance" in selected_tool:
+        return legal_compliance.invoke(query)
     else:
-        raise ValueError("agent.invoke의 반환값을 처리할 수 없습니다.")
+        return "유효한 도구가 선택되지 않았습니다."

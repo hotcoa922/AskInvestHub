@@ -10,7 +10,7 @@ from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O
 
 import logging
 # 로그 설정\
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -60,59 +60,35 @@ def market_info(query: str) -> str:
 
 
 def process_portfolio_agent(query: str) -> str:
-    tools = [financial_statement, market_info]  # 두 도구만 사용
-    custom_prefix = """
-    You have access to the following tools:
-        - financial_statement(query: str) -> str: 기업에 대한 상세한 재무적인 내용을 포함하여 답변하며 제공, .
-          당신은 최대한 상세하게 답변을 해야합니다. The final answer MUST strictly follow the format below:
-            
-          [주요 재무정보]
-            매출: 최신 매출정보를 가져옴, 미 발견시 데이터 없음 표시
-            영업이익: 최신 정보를 가져옴, 미 발견시 데이터 없음 표시
-            순이익: 최신 정보를 가져옴, 미 발견시 데이터 없음 표시
-            부채와 자본 비율: 최신 정보를 가져옴, 미 발견시 데이터 없음 표시
-            배당금 지급 현황: 최신 정보를 가져옴, 미 발견시 데이터 없음 표시
-            연구 및 개발(R&D) 지출: 새최신 정보를 가져옴, 미 발견시 데이터 없음 표시
-            
-            [주요 비용 항목]
-            운영 비용: 최신 정보를 가져옴, 미 발견시 데이터 없음 표시 + 주요 항목들 표시
-            물류 및 유통비: 최신 정보를 가져옴, 미 발견시 데이터 없음 표시 + 주요 항목들 표시
-            규제 준수 비용: 최신 정보를 가져옴, 미 발견시 데이터 없음 표시 + 주요 항목들 표시
-            에너지 비용: 최신 정보를 가져옴, 미 발견시 데이터 없음 표시 + 주요 항목들 표시
-
-            [기타 서비스 및 전략]
-            위험 관리 및 금융 전략: 최신 정보를 가져옴
-            연구 개발(R&D): 최신 정보를 가져옴
-            지속 가능성 경영: 최신 정보를 가져옴
-
-            [관련 정보 확인 위치]
-
-
-            [요약]
-            
-        - market_info(query: str) -> str: 오늘의 시황 정보는 현재 미구현 상태라고 사용자에게 알림.
-            
-        Your task is to automatically choose the appropriate tool based solely on the user's input.
+    """
+    LLM에게 적절한 도구를 선택하도록 요청
+    선택된 도구를 직접 실행
     """
 
-    agent = initialize_agent(
-        tools,
-        chat_llm,
-        agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=True,
-        agent_kwargs={"prefix": custom_prefix}
-    )
+    tool_selection_prompt = f"""
+    아래의 질문을 분석하여, 적절한 도구를 선택하세요.
 
-    result = agent.invoke({"input": query})
+    질문: "{query}"
 
-    if isinstance(result, dict):
-        if "content" in result:
-            return result["content"].strip()
-        elif "output" in result:
-            return result["output"].strip()
-        else:
-            raise ValueError("결과 딕셔너리에 'content' 또는 'output' 키가 없습니다.")
-    elif isinstance(result, str):
-        return result.strip()
+    ### 사용 가능한 도구:
+    - financial_statement: 여러 상장 기업의 정보나 재무 정보를 제공합니다. 
+    - market_info: 오늘이나 과거, 미래 등의 시장 상황에 대해 정보를 제공합니다.
+
+    **다음과 같은 형식으로만 응답하세요 (예시):**
+    - 선택: financial_statement
+    - 선택: market_info
+    """
+
+    # LLM에게 도구 선택 요청
+    response = chat_llm.invoke(tool_selection_prompt)
+    selected_tool = response.content.strip().lower()  # 소문자로 변환하여 비교
+
+    logger.info(f"도구 선택 응답: {selected_tool}")
+
+    # LLM이 선택한 도구 실행 (JSON 파싱 없이 간단한 조건문 활용)
+    if "financial_statement" in selected_tool:
+        return financial_statement.invoke(query)
+    elif "market_info" in selected_tool:
+        return market_info.invoke(query)
     else:
-        raise ValueError("agent.invoke의 반환값을 처리할 수 없습니다.")
+        return "유효한 도구가 선택되지 않았습니다."
