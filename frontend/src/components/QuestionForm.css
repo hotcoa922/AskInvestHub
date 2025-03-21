@@ -3,16 +3,17 @@
    - 모서리 곡률을 크게 주려면 최상위 컨테이너 대신 내부 요소에 주는 게 일반적.
    - 여기서는 화면 전체가 배경이므로 border-radius는 따로 주지 않음.
 */
+/* 전체 컨테이너 (최대 폭 900px) */
 .chat-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  max-width: 500px;
+  max-width: 900px; /* 750px -> 900px (20% 증가) */
   margin: 0 auto;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
-  /* 위: 연보라+핑크 파스텔 그라데이션 */
 }
+
 
 /* 헤더 영역 */
 .chat-header {
@@ -89,10 +90,7 @@
   object-fit: cover;
 }
 
-/* 말풍선:
-   - 파스텔 톤 or 살짝 반투명
-   - 넉넉한 border-radius
-*/
+/* 말풍선 */
 .message-bubble {
   max-width: 65%;
   padding: 12px 16px;
@@ -102,6 +100,7 @@
   white-space: pre-wrap;
   background: #ffffff;
   color: #333;
+  font-size: 14px; /* 12px에서 2pt 증가하여 14px로 변경 */
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 

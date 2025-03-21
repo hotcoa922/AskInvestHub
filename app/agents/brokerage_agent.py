@@ -4,13 +4,21 @@ from langchain.chains import LLMChain, llm
 
 from prompts.prompts import LEGAL_COMPLIANCE_PROMPT, FEE_SERVICE_PROMPT #미리 정의한 프롬프트 가져오기
 
-from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O, AOAI_DEPLOY_EMBED_3_LARGE
+from core.settings import AOAI_ENDPOINT, AOAI_API_KEY, AOAI_DEPLOY_GPT4O, AOAI_DEPLOY_EMBED_3_LARGE, \
+    AOAI_DEPLOY_EMBED_3_SMALL
 
 import logging
 
 # 로그 설정
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+import os
+def init_langsmith():
+    # LangSmith 설정 활성화
+    # 환경변수 LANGSMITH_TRACING, LANGSMITH_ENDPOINT, LANGSMITH_API_KEY 등이 자동으로 반영됨
+    if os.getenv("LANGSMITH_TRACING", "").lower() == "true":
+        print("[LangSmith] Tracing is enabled. All LLM calls will be tracked.")
 
 
 called_tools = []
@@ -41,14 +49,8 @@ def preprocess_legal_text(text: str) -> str:
     '제...조' 또는 '제...항' 패턴 앞뒤에 줄바꿈을 추가하고,
     '제1조\n(목적)' 같은 경우를 '제1조(목적)'로 바꿔주는 전처리.
     """
-    # '제N조' / '제N항' 앞뒤로 줄바꿈
     text = re.sub(r'(제\s*\d+(?:의\d+)?\s*(?:조|항))', r'\n\1\n', text)
-
-    # '조\n(' -> '조(' 식으로
-    # '항\n(' -> '항(' 식으로 줄바꿈 제거
     text = re.sub(r'(조|항)\n\(', r'\1(', text)
-
-    # 여러 줄바꿈 -> 1개로
     text = re.sub(r'\n+', '\n', text)
     return text
 
@@ -58,19 +60,32 @@ def split_by_article(text: str) -> list:
     '제N조(...)'를 기준으로 청크를 분할.
     """
     text = preprocess_legal_text(text)
-
-    # DOTALL 로 줄바꿈 포함, "제...조(...)" 잡기
-    # '조' 뒤에 괄호까지 포함. 혹은 '항'도 동일하게
-    # (예: 제12조(목적), 제10조의2(…))
     pattern = r'(제\s*\d+조(?:의\d+)?\([^)]*\).+?)(?=제\s*\d+조(?:의\d+)?\(|$)'
     matches = re.findall(pattern, text, flags=re.DOTALL)
-
-    # 만약 아무것도 안 잡히면, 문서 통째로 반환
     if not matches:
         return [text.strip()]
-
     return [m.strip() for m in matches]
 
+
+def chunk_by_chars(text: str, chunk_size: int = 500, overlap: int = 50) -> list:
+    """
+    글자수 기준으로 text를 chunk_size 단위로 쪼개되,
+    각 청크 사이에 overlap 만큼 겹치도록 분할.
+    """
+    chunks = []
+    start = 0
+    length = len(text)
+
+    while start < length:
+        end = start + chunk_size
+        chunk = text[start:end]
+        chunks.append(chunk)
+        # 다음 청크 시작을 overlap만큼 겹쳐서
+        start = end - overlap
+        if start < 0:
+            start = 0
+
+    return chunks
 
 
 def initialize_vector_store():
@@ -79,7 +94,7 @@ def initialize_vector_store():
     """
     global vector_store
     pdf_directory = "/data/legal_docs"  # 실제 PDF 문서 경로
-    vector_store_dir = "/data/vector_store/faiss_index"  # 절대경로로 지정
+    vector_store_dir = "/data/vector_store/faiss_index"
 
     if os.path.exists(vector_store_dir):
         logger.info("저장된 벡터 DB 로드 중...")
@@ -91,10 +106,9 @@ def initialize_vector_store():
         )
         try:
             vector_store = FAISS.load_local(vector_store_dir, embeddings, allow_dangerous_deserialization=True)
-            logger.info(f"벡터 DB 로드 완료 (차원: {vector_store.index.d})")  # 추가된 로그
+            logger.info(f"벡터 DB 로드 완료 (차원: {vector_store.index.d})")
         except Exception as e:
             logger.error(f"벡터 DB 로드 실패: {e}, 새로 생성 중...")
-
     else:
         logger.info("벡터 DB 구축 중...")
         documents = []
@@ -105,33 +119,44 @@ def initialize_vector_store():
                     if os.stat(file_path).st_size == 0:
                         logger.warning("빈 PDF 파일 건너뛰기: %s", file_path)
                         continue
+
                     try:
                         loader = PyPDFLoader(file_path)
-                        docs = loader.load()
+                        docs = loader.load()  # 페이지별 Document 리스트
                     except Exception as e:
                         logger.warning("PDF 로드 중 오류 발생, 파일 무시: %s, 오류: %s", file_path, e)
                         continue
 
-                    for doc in docs:
-                        chunks = split_by_article(doc.page_content)
-                        for chunk in chunks:
-                            # 여기서 "제N조(…)" 찾기 (조 뒤 괄호까지)
-                            # 줄바꿈 때문에 안 잡히지 않도록 전처리에서 미리 \n제 -> 전부 한 줄로
-                            match = re.search(r'(제\s*\d+조(?:의\d+)?\([^)]*\))', chunk)
-                            if match:
-                                article_name = match.group(1).strip()
-                            else:
-                                article_name = "UNKNOWN_ARTICLE"
+                    # 1) 여러 페이지를 하나로 합침
+                    merged_text = "\n".join(doc.page_content for doc in docs)
 
+                    # 2) '제N조(...)' 단위로 분할
+                    article_chunks = split_by_article(merged_text)
+
+                    for article_chunk in article_chunks:
+                        # 3) 각 article_chunk를 다시 500자 단위로 재분할 (오버랩 50자)
+                        small_chunks = chunk_by_chars(article_chunk, chunk_size=500, overlap=50)
+
+                        # 기사(조항) 제목을 추출
+                        match = re.search(r'(제\s*\d+조(?:의\d+)?\([^)]*\))', article_chunk)
+                        if match:
+                            article_name = match.group(1).strip()
+                        else:
+                            article_name = "UNKNOWN_ARTICLE"
+
+                        # 4) 최종 Document 생성
+                        for i, small_chunk in enumerate(small_chunks, start=1):
                             documents.append(
                                 Document(
-                                    page_content=chunk,
-                                    metadata={"source": f"{file_path} - {article_name}"}
+                                    page_content=small_chunk,
+                                    metadata={
+                                        "source": f"{filename} - {article_name}",
+                                        "chunk_idx": i
+                                    }
                                 )
                             )
 
             logger.info("문서 전처리 완료. 총 %d개 청크", len(documents))
-            logger.info(documents)
         else:
             logger.warning("PDF 디렉토리가 존재하지 않습니다: %s", pdf_directory)
 
@@ -144,10 +169,8 @@ def initialize_vector_store():
         vector_store = FAISS.from_documents(documents, embeddings)
         vector_store.save_local(vector_store_dir)
         logger.info("벡터 DB 구축 완료.")
+
     logger.info("최종: 벡터 DB 구축/로드 완료.")
-
-# --- AzureChatOpenAI 인스턴스 생성 ---
-
 
 
 # AzureChatOpenAI 인스턴스 생성

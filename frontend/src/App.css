@@ -1,25 +1,64 @@
-/* src/App.css */
-body {
-  background: linear-gradient(135deg, #1f1c2c, #928dab);
-  font-family: 'Roboto', sans-serif;
-  color: #fff;
+html, body {
+  height: 100%;
   margin: 0;
   padding: 0;
+  background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
 }
 
-.container {
+/* src/App.css */
+.app-container {
   display: flex;
-  align-items: center;
+  flex-direction: row;
+  align-items: flex-start;
   justify-content: center;
   min-height: 100vh;
+  background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-.card {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+/* 환영 화면 스타일 (전체화면) */
+.welcome-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+}
+
+.welcome-card {
+  background: rgba(255,255,255,0.9);
   padding: 30px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-  width: 100%;
-  max-width: 500px;
+  border-radius: 20px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
   text-align: center;
+  max-width: 90%;
+}
+
+.welcome-card h1 {
+  font-size: 2em;
+  margin-bottom: 0.5em;
+  color: #333;
+}
+
+.welcome-card p {
+  font-size: 1em;
+  margin-bottom: 1.5em;
+  color: #555;
+  line-height: 1.5;
+}
+
+.start-button {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #55efc4 0%, #00cec9 100%);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1em;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.start-button:hover {
+  opacity: 0.9;
 }

@@ -1,12 +1,18 @@
-/* 전체 컨테이너 (가로 폭 600px로 늘림) */
-.chat-container {
+/* src/components/ChatWindow.css */
+
+/* 채팅 인터페이스 내부 컨테이너 (채팅창 중앙 배치, 세로 길이 90vh) */
+.chat-container-inner {
+  width: 70%;
+  max-width: 750px;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  max-width: 600px; /* 기존 500px에서 600px로 변경 */
+  height: 90vh;
+  background: rgba(255,255,255,0.6);
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
   margin: 0 auto;
-  font-family: 'Helvetica Neue', Arial, sans-serif;
-  background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
 }
 
 /* 헤더 영역 */
@@ -18,7 +24,6 @@
   background: linear-gradient(135deg, #ffffff 0%, #f9f9f9 100%);
   padding: 12px;
   border-bottom: 1px solid rgba(0,0,0,0.05);
-  border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
@@ -45,16 +50,12 @@
   justify-content: center;
 }
 
-/* 채팅창 (반투명 + 곡률 + 그림자) */
+/* 채팅창 영역 */
 .chat-window {
   flex: 1;
   overflow-y: auto;
   margin: 10px;
   padding: 10px;
-  background: rgba(255,255,255,0.6);
-  border-radius: 16px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  backdrop-filter: blur(8px);
 }
 
 /* 메시지 레이아웃 */
@@ -81,7 +82,7 @@
   object-fit: cover;
 }
 
-/* 말풍선 (글자 크기 줄이기: 13px) */
+/* 말풍선 */
 .message-bubble {
   max-width: 65%;
   padding: 12px 16px;
@@ -91,13 +92,54 @@
   white-space: pre-wrap;
   background: #ffffff;
   color: #333;
-  font-size: 13px; /* 글자 크기 줄임 */
+  font-size: 14px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .chat-message.user .message-bubble {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   color: #333;
+}
+
+/* 마크다운 요소 스타일 */
+.message-bubble h1 {
+  font-size: 1.5em;
+  margin: 0.5em 0;
+  font-weight: bold;
+  color: #333;
+}
+
+.message-bubble h2 {
+  font-size: 1.3em;
+  margin: 0.5em 0;
+  font-weight: bold;
+  color: #444;
+}
+
+.message-bubble h3 {
+  font-size: 1.1em;
+  margin: 0.5em 0;
+  font-weight: bold;
+  color: #555;
+}
+
+.message-bubble strong {
+  font-weight: bold;
+  color: #222;
+}
+
+.message-bubble ul {
+  margin: 0.5em 0;
+  padding-left: 1.2em;
+}
+
+.message-bubble li {
+  margin-bottom: 0.3em;
+}
+
+.message-bubble del {
+  text-decoration: line-through;
+  color: #888;
 }
 
 /* 로딩 중 말풍선 */
@@ -127,7 +169,6 @@
   padding: 10px;
   background: rgba(255,255,255,0.6);
   backdrop-filter: blur(8px);
-  border-bottom-left-radius: 16px;
   border-bottom-right-radius: 16px;
   box-shadow: 0 -2px 6px rgba(0,0,0,0.1);
 }

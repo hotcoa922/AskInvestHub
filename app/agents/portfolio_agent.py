@@ -23,6 +23,8 @@ chat_llm = AzureChatOpenAI(
 
 from langchain_core.tools import tool
 
+
+
 @tool
 def financial_statement(query: str) -> str:
     """

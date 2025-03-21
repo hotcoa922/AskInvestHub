@@ -1,0 +1,33 @@
+/* src/components/Sidebar.css */
+.sidebar {
+  width: 25%;
+  max-width: 300px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  border-radius: 20px;
+  margin-right: 20px;
+}
+
+.sidebar h3 {
+  margin-top: 0;
+  color: #333;
+  font-size: 1.2em;
+}
+
+.sidebar ul {
+  list-style: disc;
+  padding-left: 20px;
+}
+
+.sidebar li {
+  margin-bottom: 8px;
+  font-size: 0.95em;
+  color: #555;
+}
+
+.sidebar p {
+  font-size: 0.95em;
+  color: #555;
+  line-height: 1.4;
+}

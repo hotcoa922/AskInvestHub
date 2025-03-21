@@ -16,6 +16,13 @@ app = FastAPI(
     description="에이전트 기반 AI 서비스 (법률 및 포트폴리오 분석)",
     version="0.7.0"
 )
+import os
+def init_langsmith():
+    # LangSmith 설정 활성화
+    # 환경변수 LANGSMITH_TRACING, LANGSMITH_ENDPOINT, LANGSMITH_API_KEY 등이 자동으로 반영됨
+    if os.getenv("LANGSMITH_TRACING", "").lower() == "true":
+        print("[LangSmith] Tracing is enabled. All LLM calls will be tracked.")
+
 
 # 벡터 DB 초기화 함수 임포트
 from agents.brokerage_agent import initialize_vector_store
